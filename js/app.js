@@ -364,7 +364,7 @@
     if (el.dataset.upload && el.files.length) upload(el.files, el.dataset.upload);
   });
   document.addEventListener('click', async e => {
-    const f = e.target.closest('.fs-btns button'); if (f) { setFs(f.dataset.fs); return; }
+    const f = e.target.closest('.fs-btns button'); if (f) { setFs(f.dataset.fs, true); return; }
     const el = e.target.closest('[data-act]'); if (!el) return;
     const a = el.dataset.act;
     if (a === 'go') { location.hash = el.dataset.to; return; }
@@ -423,9 +423,9 @@
   });
   $('#viewer').addEventListener('click', () => $('#viewer').classList.remove('on'));
 
-  function setFs(n) {
+  function setFs(n, save) {
     document.documentElement.dataset.fs = n;
-    try { localStorage.setItem('tm-fs', n); } catch (e) { /* ignore */ }
+    if (save) { try { localStorage.setItem('tm-fs-v2', n); } catch (e) { /* ignore */ } } // 직접 고른 크기만 기억
     $$('.fs-btns button').forEach(b => b.classList.toggle('on', b.dataset.fs === String(n)));
   }
   function showWho() { $('#who').textContent = myName() ? `✏️ ${myName()}` : '✏️ 기록자 이름 설정'; }
@@ -448,7 +448,7 @@
   tick(); setInterval(tick, 1000);
 
   /* =================== 시작 =================== */
-  setFs(document.documentElement.dataset.fs || '2');
+  setFs(document.documentElement.dataset.fs || '1'); // 기본: 가장 작은 글씨
   showWho(); syncStatus(); render();
   if (READY) { pull().then(() => { if (!isTyping()) render(); push(); }); if (!myName()) openName(); }
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
