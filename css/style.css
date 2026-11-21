@@ -476,3 +476,9 @@ body { padding-bottom: calc(70px + var(--lane) + 16px + env(safe-area-inset-bott
 /* 접근성: 주황색 대비 4.5:1 이상 (흰 글씨·노란 배경 모두 통과) */
 :root { --accent: #b8471a; }
 .clk.cn { background: rgba(184, 71, 26, .55); }
+
+/* 속도: 화면 밖 카드는 보일 때 그리기 */
+.fold-group, .org-foot, .org-list .org-row:nth-child(n+5), .qa-item, .sheet h3 ~ table { content-visibility: auto; contain-intrinsic-size: auto 300px; }
+.org-list .org-row:nth-child(n+5) { contain-intrinsic-size: auto 84px; }
+.qa-item { contain-intrinsic-size: auto 240px; }
+@media print { .fold-group, .org-foot, .qa-item, .sheet h3 ~ table { content-visibility: visible; } }
