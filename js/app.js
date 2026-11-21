@@ -60,10 +60,13 @@
   }
 
   // 서버에서 최신 기록·사진을 받아옴. 내용이 바뀌었을 때만 true (불필요한 다시 그리기 방지)
-  let lastSig = '', pulling = null;
-  function pull() {
+  const sigOf = (rows, photos) => rows.map(r => r.key + r.updated_at).sort().join() + '|' + photos.map(p => p.id + p.caption).join();
+  // 휴대폰에 저장된 내용 기준으로 시작 → 서버 내용이 같으면 다시 그리지 않음
+  let lastSig = sigOf(Object.values(E).filter(r => !OB[r.key]), PH), pulling = null, lastPullAt = 0;
+  function pull(force) {
     if (!READY) { syncStatus(); return Promise.resolve(false); }
     if (pulling) return pulling; // 동시에 여러 번 부르면 한 번만 요청
+    if (!force && Date.now() - lastPullAt < 3000) return Promise.resolve(false); // 3초 안에 다시 부르면 생략
     pulling = (async () => {
       let changed = false;
       try {
@@ -71,7 +74,8 @@
           sb(`/rest/v1/entries?trip=eq.${T.id}&select=key,value,author,updated_at`),
           sb(`/rest/v1/photos?trip=eq.${T.id}&select=*&order=created_at.asc`)
         ]);
-        const sig = rows.map(r => r.key + r.updated_at).sort().join() + '|' + photos.map(p => p.id + p.caption).join();
+        lastPullAt = Date.now();
+        const sig = sigOf(rows, photos);
         changed = sig !== lastSig; lastSig = sig;
         if (changed) {
           const fresh = {};
@@ -208,7 +212,7 @@
     ${fold('👥', 'c5', '업무분장', `${T.members.map(m => m.role.split('·')[0]).join(' · ')}`,
       T.members.map(m => `<p><b>${esc(m.role)}</b> ${esc(m.name)}<br><span class="muted">${m.duty.map(esc).join(' · ')}</span></p>`).join(''))}
     </div>
-    <footer class="org-foot"><img src="img/logo-wide.jpg" alt="부산광역시교육청" loading="lazy"><span>초등교육과 · 2026 상하이교육위원회 정기 방문</span></footer>`;
+    <footer class="org-foot"><img src="img/logo-wide.jpg" alt="부산광역시교육청" loading="lazy" decoding="async" width="600" height="162"><span>초등교육과 · 2026 상하이교육위원회 정기 방문</span></footer>`;
   };
 
   /* --- 기관 기록 목록 --- */
@@ -370,14 +374,14 @@
     // 같은 화면을 다시 그릴 때는 펼친 카드·스크롤 위치를 그대로 유지
     const same = route === lastRoute;
     const openIdx = same ? $$('details', app).map((d, i) => d.open ? i : -1).filter(i => i >= 0) : [];
-    const y = window.scrollY;
+    const y = same ? window.scrollY : 0;
     const needDb = ['orgs', 'org', 'daily', 'report'].includes(cur);
     app.innerHTML = needDb && !READY ? setupPage() : pages[cur](param);
     if (same) { const ds = $$('details', app); openIdx.forEach(i => { if (ds[i]) ds[i].open = true; }); window.scrollTo(0, y); }
     lastRoute = route;
     $$('.bottom-nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === (cur === 'org' ? 'orgs' : cur)));
     growAll();
-    if (animate) { app.classList.remove('page-in'); void app.offsetWidth; app.classList.add('page-in'); }
+    if (animate) { app.classList.remove('page-in'); requestAnimationFrame(() => app.classList.add('page-in')); } // 강제 재계산 없이 애니메이션 재시작
   }
   function grow(t) { t.style.height = 'auto'; t.style.height = Math.max(t.scrollHeight + 4, 90) + 'px'; }
   function growAll() { // 읽기→쓰기를 한꺼번에 해서 화면 재계산을 최소화
@@ -477,18 +481,23 @@
   /* =================== 한국·중국 시계 (기기 시간대와 무관하게 정확) =================== */
   const clkFmt = tz => { try { return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); } catch (e) { return null; } };
   const fKR = clkFmt('Asia/Seoul'), fCN = clkFmt('Asia/Shanghai');
-  function clockHtml(f, offsetH) {
-    let s;
-    if (f) s = f.format(new Date());
-    else { const d = new Date(Date.now() + (offsetH * 60 + new Date().getTimezoneOffset()) * 60000); s = [d.getHours(), d.getMinutes(), d.getSeconds()].map(pad).join(':'); }
-    const [h, m, sec] = s.split(':');
-    return `${h}:${m}<small>:${sec}</small>`;
+  function clockParts(f, offsetH) {
+    if (f) return f.format(new Date()).split(':');
+    const d = new Date(Date.now() + (offsetH * 60 + new Date().getTimezoneOffset()) * 60000);
+    return [d.getHours(), d.getMinutes(), d.getSeconds()].map(pad);
   }
+  // 시계 숫자만 글자로 바꿔 끼움 (매초 HTML을 새로 만들지 않아 가벼움)
+  const CLK = [['#clkKR', fKR, 9], ['#clkCN', fCN, 8]].map(([sel, f, off]) => {
+    const el = $(sel); if (!el) return null;
+    el.textContent = ''; const hm = document.createTextNode(''); const s = document.createElement('small');
+    el.append(hm, s); return { f, off, hm, s, lastHm: '' };
+  }).filter(Boolean);
   function tick() {
-    const kr = $('#clkKR'), cn = $('#clkCN'); if (!kr) return;
-    kr.innerHTML = clockHtml(fKR, 9); cn.innerHTML = clockHtml(fCN, 8);
+    if (document.hidden) return; // 화면이 꺼져 있으면 쉬기 (배터리 절약)
+    CLK.forEach(c => { const [h, m, sec] = clockParts(c.f, c.off); const hmT = h + ':' + m; if (hmT !== c.lastHm) { c.hm.data = hmT; c.lastHm = hmT; } c.s.textContent = ':' + sec; });
   }
   tick(); setInterval(tick, 1000);
+  document.addEventListener('visibilitychange', tick);
 
   /* =================== 시작 =================== */
   setFs(document.documentElement.dataset.fs || '1'); // 기본: 가장 작은 글씨

@@ -472,3 +472,7 @@ body { padding-bottom: calc(70px + var(--lane) + 16px + env(safe-area-inset-bott
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 .fold > summary::after, .fold[open] > summary::after { content: none !important; display: none; }
+
+/* 접근성: 주황색 대비 4.5:1 이상 (흰 글씨·노란 배경 모두 통과) */
+:root { --accent: #b8471a; }
+.clk.cn { background: rgba(184, 71, 26, .55); }
