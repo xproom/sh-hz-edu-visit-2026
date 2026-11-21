@@ -162,9 +162,14 @@
   const dayTabs = (sel, base) => `<div class="day-tabs">${T.days.map(x => `<button data-act="go" data-to="${base}/${x.n}" class="${x.n === sel ? 'on' : ''} ${x.date === todayStr() ? 'today' : ''}">${x.n}일차<small>${x.label}</small></button>`).join('')}</div>`;
 
   function questions(org) {
-    const seed = org.q.map((q, i) => ({ id: `seed-${org.id}-${i}`, q, custom: false }));
+    // 준비 질문: 고친 문장(qt:키)이 있으면 그것을, 없으면 원래 질문을 사용
+    const seed = org.q.map((q, i) => {
+      const id = `seed-${org.id}-${i}`, key = `qt:${id}`, edited = v(key).trim();
+      return { id, q: edited || q, orig: q, edited: !!edited, custom: false, key };
+    });
+    // 현장 추가 질문: 추가한 순서대로 (고쳐도 순서가 바뀌지 않음)
     const custom = Object.keys(E).filter(k => k.startsWith(`qx:${org.id}:`) && v(k).trim())
-      .sort((a, b) => (E[a].updated_at < E[b].updated_at ? -1 : 1))
+      .sort((a, b) => parseInt(a.split(':')[2], 36) - parseInt(b.split(':')[2], 36))
       .map(k => ({ id: k.split(':')[2], q: v(k), custom: true, key: k }));
     return seed.concat(custom);
   }
@@ -236,7 +241,16 @@
 
     ${o.q.length || questions(o).length ? `<h3 class="sec">💬 질의 · 답변</h3>
     ${questions(o).map((x, i) => `<div class="qa-item ${v(`qa:${x.id}:a`).trim() ? 'done' : ''}">
-      <div class="q"><span>Q${i + 1}</span>${esc(x.q)}</div>
+      <div class="q-row"><div class="q"><span>Q${i + 1}</span><span class="q-text">${esc(x.q)}</span></div>
+        <button class="q-edit" data-act="q-edit" data-key="${x.key}" aria-label="Q${i + 1} 질문 수정">✏️ 수정</button></div>
+      <div class="q-editor" hidden>
+        <textarea class="inp" rows="3" aria-label="질문 고치기">${esc(x.q)}</textarea>
+        <div class="q-editor-btns"><button class="btn small" data-act="q-save" data-key="${x.key}">저장</button>
+          <button class="btn small line" data-act="q-cancel">취소</button>
+          ${x.edited ? `<button class="btn small line" data-act="q-restore" data-key="${x.key}">원래 질문으로</button>` : ''}</div>
+        ${x.edited ? `<p class="q-orig">원래 질문: ${esc(x.orig)}</p>` : ''}
+      </div>
+      ${x.edited ? `<div class="writer">✏️ 질문 수정됨 · ${esc((E[x.key] && E[x.key].author) || '')}</div>` : ''}
       ${area(`qa:${x.id}:a`, '답변', '들은 답변을 적어 주세요', 3)}
       ${x.custom ? `<button class="link-del" data-act="q-del" data-key="${x.key}">이 질문 삭제</button>` : ''}</div>`).join('')}
     <div class="add-q"><textarea class="inp" rows="2" id="newq" placeholder="현장에서 나온 질문 추가"></textarea><button class="btn small" data-act="q-add" data-org="${o.id}">＋ 추가</button></div>` : ''}
@@ -441,6 +455,19 @@
       const t = $('#newq'); const q = t.value.trim(); if (!q) { t.focus(); return; }
       put(`qx:${el.dataset.org}:${Date.now().toString(36)}`, q); await push(); render(); toast('질문을 추가했습니다'); return;
     }
+    if (a === 'q-edit' || a === 'q-cancel') { // 질문 수정 칸 열기/닫기
+      const item = el.closest('.qa-item'); const ed = $('.q-editor', item); const open = a === 'q-edit';
+      ed.hidden = !open; $('.q-row', item).hidden = open;
+      if (open) { const t = $('textarea', ed); grow(t); t.focus(); t.setSelectionRange(t.value.length, t.value.length); }
+      else { $('textarea', ed).value = $('.q-text', item).textContent; }
+      return;
+    }
+    if (a === 'q-save') {
+      const t = $('textarea', el.closest('.q-editor')); const q = t.value.trim();
+      if (!q) { toast('질문 내용을 입력해 주세요'); t.focus(); return; }
+      put(el.dataset.key, q); await push(); render(); toast('질문을 수정했습니다'); return;
+    }
+    if (a === 'q-restore') { put(el.dataset.key, ''); await push(); render(); toast('원래 질문으로 되돌렸습니다'); return; }
     if (a === 'q-del') { if (!confirm('이 질문을 삭제할까요?')) return; put(el.dataset.key, ''); await push(); render(); return; }
     if (a === 'ph-del') {
       if (!confirm('이 사진을 삭제할까요?')) return;

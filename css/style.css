@@ -482,3 +482,15 @@ body { padding-bottom: calc(70px + var(--lane) + 16px + env(safe-area-inset-bott
 .org-list .org-row:nth-child(n+5) { contain-intrinsic-size: auto 84px; }
 .qa-item { contain-intrinsic-size: auto 240px; }
 @media print { .fold-group, .org-foot, .qa-item, .sheet h3 ~ table { content-visibility: visible; } }
+
+/* ---- 질문 수정 ---- */
+.q-row { display: flex; align-items: flex-start; gap: 8px; }
+.q-row .q { flex: 1; min-width: 0; }
+.q-edit { flex: 0 0 auto; min-height: 40px; padding: 4px 12px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; color: var(--navy); font-size: .8rem; font-weight: 700; cursor: pointer; transition: background .15s ease, transform .12s ease; }
+.q-edit:active { transform: scale(.95); background: var(--navy-l); }
+.q-editor { margin-top: 4px; animation: foldIn .25s ease both; }
+.q-editor textarea { min-height: 80px; border-color: var(--navy); }
+.q-editor-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.q-orig { font-size: .8rem; color: var(--muted); margin: 8px 0 0; }
+[hidden] { display: none !important; }
+.qa-item .q .q-text { flex: 1; min-width: 0; background: none; color: var(--ink); height: auto; padding: 0; border-radius: 0; font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
