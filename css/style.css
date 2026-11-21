@@ -389,3 +389,7 @@ body { padding-bottom: calc(70px + var(--lane) + 16px + env(safe-area-inset-bott
 .sync.warn { background: #fff4e5; }
 .toast { bottom: calc(70px + var(--lane) + 20px + env(safe-area-inset-bottom)); }
 @media (max-width: 480px) { .sync { padding-right: 180px; font-size: .74rem; } }
+/* GitHub Pages: 배지 없음 → 저장 상태 띠를 낮고 넓게 */
+:root { --lane: 34px; }
+.sync, .sync.warn { padding-right: 16px; justify-content: center; }
+@media (max-width: 480px) { .sync { padding-right: 16px; } }
