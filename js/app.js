@@ -257,7 +257,7 @@
     const d = new Date();
     const title = rv('title', `2026년 ${T.title} 공무국외출장 결과보고서`);
     const insights = T.orgs.map(o => v(`note:${o.id}:insight`).trim() ? `○ (${o.name}) ${withSig(`note:${o.id}:insight`)}` : '').filter(Boolean).join('\n');
-    return { title, html: `<div class="rep-logo"><img src="${location.origin}/img/logo-wide.jpg" alt="부산광역시교육청" width="220"></div><h1>${esc(title)}</h1><div class="rep-org">${esc(T.org)} · ${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.</div>
+    return { title, html: `<div class="rep-logo"><img src="${new URL('img/logo-wide.jpg', location.href).href}" alt="부산광역시교육청" width="220"></div><h1>${esc(title)}</h1><div class="rep-org">${esc(T.org)} · ${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.</div>
     <h2>Ⅰ. 출장 개요</h2><table>
       <tr><th>목적</th><td>${T.purpose.map(esc).join('<br>')}</td></tr>
       <tr><th>기간</th><td>2026. 11. 29.(일) ~ 12. 3.(목) [${T.nights}]</td></tr>
