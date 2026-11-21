@@ -393,3 +393,19 @@ body { padding-bottom: calc(70px + var(--lane) + 16px + env(safe-area-inset-bott
 :root { --lane: 34px; }
 .sync, .sync.warn { padding-right: 16px; justify-content: center; }
 @media (max-width: 480px) { .sync { padding-right: 16px; } }
+
+/* ---- 한국·중국 시계 ---- */
+.topbar .brand { min-width: 0; }
+.clocks { display: flex; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+.clk { display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,.12); border-radius: 12px; padding: 4px 12px; min-width: 92px; line-height: 1.15; }
+.clk.cn { background: rgba(217, 98, 43, .35); }
+.clk .lb { font-size: 12px; opacity: .9; white-space: nowrap; }
+.clk b { font-size: 20px; font-variant-numeric: tabular-nums; letter-spacing: .02em; color: #fff; }
+.clk b small { font-size: .7em; opacity: .75; }
+@media (max-width: 640px) {
+  .clocks { flex-direction: column; gap: 2px; }
+  .clk { flex-direction: row; gap: 6px; padding: 2px 8px; min-width: 0; border-radius: 8px; }
+  .clk .lb { font-size: 11px; }
+  .clk b { font-size: 14px; }
+  .clk b small { display: none; }
+}

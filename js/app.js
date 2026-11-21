@@ -431,6 +431,22 @@
   function showWho() { $('#who').textContent = myName() ? `✏️ ${myName()}` : '✏️ 기록자 이름 설정'; }
   function openName() { $('#nameInput').value = myName(); $('#nameModal').classList.add('on'); setTimeout(() => $('#nameInput').focus(), 50); }
 
+  /* =================== 한국·중국 시계 (기기 시간대와 무관하게 정확) =================== */
+  const clkFmt = tz => { try { return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }); } catch (e) { return null; } };
+  const fKR = clkFmt('Asia/Seoul'), fCN = clkFmt('Asia/Shanghai');
+  function clockHtml(f, offsetH) {
+    let s;
+    if (f) s = f.format(new Date());
+    else { const d = new Date(Date.now() + (offsetH * 60 + new Date().getTimezoneOffset()) * 60000); s = [d.getHours(), d.getMinutes(), d.getSeconds()].map(pad).join(':'); }
+    const [h, m, sec] = s.split(':');
+    return `${h}:${m}<small>:${sec}</small>`;
+  }
+  function tick() {
+    const kr = $('#clkKR'), cn = $('#clkCN'); if (!kr) return;
+    kr.innerHTML = clockHtml(fKR, 9); cn.innerHTML = clockHtml(fCN, 8);
+  }
+  tick(); setInterval(tick, 1000);
+
   /* =================== 시작 =================== */
   setFs(document.documentElement.dataset.fs || '2');
   showWho(); syncStatus(); render();
