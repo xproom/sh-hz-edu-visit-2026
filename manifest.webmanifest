@@ -1,0 +1,14 @@
+{
+  "name": "상하이교육위원회 정기 방문 2026",
+  "short_name": "상하이 출장",
+  "start_url": "./#home",
+  "display": "standalone",
+  "background_color": "#f4f2ee",
+  "theme_color": "#2f3a66",
+  "lang": "ko",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
