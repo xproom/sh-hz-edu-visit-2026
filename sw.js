@@ -1,6 +1,6 @@
 /* 오프라인 캐시 – 안내 화면을 인터넷이 약해도 열 수 있게 함 (기록은 Supabase에 저장) */
-const CACHE = 'tripmoa-sh2026-v10';
-const ASSETS = ['./', 'index.html', 'css/style.css?v=10', 'js/config.js?v=10', 'js/data.js?v=10', 'js/app.js?v=10', 'manifest.webmanifest', 'icon.svg', 'img/logo-emblem.jpg', 'img/logo-wide.jpg'];
+const CACHE = 'tripmoa-sh2026-v11';
+const ASSETS = ['./', 'index.html', 'css/style.css?v=11', 'js/config.js?v=11', 'js/data.js?v=11', 'js/app.js?v=11', 'manifest.webmanifest', 'icon.svg', 'img/logo-emblem.jpg', 'img/logo-wide.jpg'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
