@@ -59,19 +59,34 @@
     else setSync('✓ 저장됨 ' + hhmm(), 'ok');
   }
 
-  async function pull() {
-    if (!READY) { syncStatus(); return; }
-    try {
-      const rows = await sb(`/rest/v1/entries?trip=eq.${T.id}&select=key,value,author,updated_at`);
-      const fresh = {};
-      rows.forEach(r => { fresh[r.key] = r; });
-      Object.values(OB).forEach(r => { fresh[r.key] = r; }); // 미전송 내 기록이 우선
-      E = fresh;
-      PH = await sb(`/rest/v1/photos?trip=eq.${T.id}&select=*&order=created_at.asc`);
-      ls.set('tm2-photos-' + T.id, PH);
-      saveLocal(); online = true;
-    } catch (e) { online = false; }
-    syncStatus();
+  // 서버에서 최신 기록·사진을 받아옴. 내용이 바뀌었을 때만 true (불필요한 다시 그리기 방지)
+  let lastSig = '', pulling = null;
+  function pull() {
+    if (!READY) { syncStatus(); return Promise.resolve(false); }
+    if (pulling) return pulling; // 동시에 여러 번 부르면 한 번만 요청
+    pulling = (async () => {
+      let changed = false;
+      try {
+        const [rows, photos] = await Promise.all([ // 기록과 사진 목록을 동시에 요청
+          sb(`/rest/v1/entries?trip=eq.${T.id}&select=key,value,author,updated_at`),
+          sb(`/rest/v1/photos?trip=eq.${T.id}&select=*&order=created_at.asc`)
+        ]);
+        const sig = rows.map(r => r.key + r.updated_at).sort().join() + '|' + photos.map(p => p.id + p.caption).join();
+        changed = sig !== lastSig; lastSig = sig;
+        if (changed) {
+          const fresh = {};
+          rows.forEach(r => { fresh[r.key] = r; });
+          Object.values(OB).forEach(r => { fresh[r.key] = r; }); // 미전송 내 기록이 우선
+          E = fresh; PH = photos;
+          ls.set('tm2-photos-' + T.id, PH); saveLocal();
+        }
+        online = true;
+      } catch (e) { online = false; }
+      syncStatus();
+      pulling = null;
+      return changed;
+    })();
+    return pulling;
   }
 
   function put(key, value) {
@@ -96,13 +111,16 @@
       saveLocal(); online = true;
     } catch (e) { online = false; }
     pushing = false;
+    // 보내는 동안 새로 적은 내용이 있으면 바로 이어서 전송
+    if (online && Object.keys(OB).length) { setTimeout(push, 300); return; }
     syncStatus();
+    if (online && !Object.keys(OB).length) { const s = $('#sync'); s.classList.remove('flash'); void s.offsetWidth; s.classList.add('flash'); }
   }
   setInterval(() => { if (Object.keys(OB).length) push(); }, 15000);
   window.addEventListener('online', () => push());
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') push(true);
-    else pull().then(() => { if (!isTyping()) render(); });
+    else refresh();
   });
   const isTyping = () => { const a = document.activeElement; return a && /^(TEXTAREA|INPUT)$/.test(a.tagName); };
 
@@ -132,6 +150,11 @@
   function area(key, label, ph, rows = 4) {
     return `<label class="f">${label}<textarea class="inp" rows="${rows}" data-key="${key}" placeholder="${esc(ph || '')}">${esc(v(key))}</textarea></label><div class="writer" data-w="${key}">${esc(writerText(key))}</div>`;
   }
+  // 접이식 카드: 아이콘 배지 + 제목 + 한 줄 미리보기 + 회전 화살표 (sub는 이미 안전한 문자열)
+  const fold = (ico, tone, title, sub, body) => `<details class="card fold"><summary>
+      <span class="f-ico ${tone}" aria-hidden="true">${ico}</span>
+      <span class="f-txt"><b>${title}</b><small>${sub}</small></span>
+      <span class="f-chev" aria-hidden="true"></span></summary><div class="fold-body">${body}</div></details>`;
   const dayTabs = (sel, base) => `<div class="day-tabs">${T.days.map(x => `<button data-act="go" data-to="${base}/${x.n}" class="${x.n === sel ? 'on' : ''} ${x.date === todayStr() ? 'today' : ''}">${x.n}일차<small>${x.label}</small></button>`).join('')}</div>`;
 
   function questions(org) {
@@ -168,19 +191,23 @@
     ${h ? `<div class="card"><h3>🏨 오늘 숙소</h3><p class="big" style="margin:0">${esc(h.ko)}</p><p class="muted">${esc(h.name)}</p>
       <div class="btn-row"><a class="btn" href="tel:${tel(h.tel)}">📞 전화</a><button class="btn orange" data-act="taxi" data-kind="hotel" data-i="${d.hotel}">🚕 기사에게 보여주기</button></div></div>`
       : `<div class="card"><h3>🛫 귀국</h3><p>상하이 푸동 18:30 출발 → 부산 20:30 도착 (춘추항공)</p></div>`}
-    <details class="card fold"><summary>✈️ 항공 · 차량 · 숙소 전체</summary>
-      ${T.flights.map(f => `<p><b>${f.type} ${esc(f.date)}</b> ${esc(f.airline)}<br>${esc(f.from)} ${f.dep} → ${esc(f.to)} ${f.arr}</p>`).join('')}
-      <p><b>차량</b> ${esc(T.vehicle.title)} (상하이↔항저우 약 3시간)</p>
-      ${T.hotels.map((x, i) => `<p><b>${esc(x.city)}</b> ${esc(x.nights)}<br>${esc(x.ko)}<br><span class="muted">${esc(x.addr)}</span><br><a href="tel:${tel(x.tel)}">📞 ${esc(x.tel)}</a> · <a href="#" data-act="taxi" data-kind="hotel" data-i="${i}">🚕 중국어 주소</a></p>`).join('')}</details>
-    <details class="card fold"><summary>🚨 비상 연락처</summary>${T.emergency.map(e => `<p class="em"><span>${esc(e.k)}</span><a class="btn small line" href="tel:${tel(e.v)}">📞 ${esc(e.v)}</a></p>`).join('')}</details>
-    <details class="card fold"><summary>💱 환율 · 날씨 · 시차</summary>
-      <p>1위안 = <b>${T.rate}원</b> (11.16. 기준) · 중국은 한국보다 <b>1시간 느림</b></p>
-      <label class="f">위안 → 원<input class="inp" id="cny" inputmode="decimal" placeholder="위안 입력"></label><p class="big" id="krwOut"></p>
-      ${T.weather.map(w => `<p>🌤️ ${w.city}: 평균 ${w.low}°~${w.high}°, 강수 ${w.rain}</p>`).join('')}</details>
-    <details class="card fold"><summary>📚 참고: 중국 교육 동향</summary>
-      ${T.edu.trends.map((t, i) => `<p><b>${i + 1}. ${esc(t.t)}</b><br>${esc(t.d)}</p>`).join('')}
-      <p><b>학제</b> 초6·중3·고3 (상하이 초5·중4) · 의무교육 9년 · 대입 가오카오</p><p>${esc(T.edu.pisa)}</p></details>
-    <details class="card fold"><summary>👥 업무분장</summary>${T.members.map(m => `<p><b>${esc(m.role)}</b> ${esc(m.name)}<br><span class="muted">${m.duty.map(esc).join(' · ')}</span></p>`).join('')}</details>
+    <div class="fold-group">
+    ${fold('✈️', 'c1', '항공 · 차량 · 숙소', '출국 11.29. 12:35 · 귀국 12.3. 18:30 · 호텔 2곳',
+      T.flights.map(f => `<p><b>${f.type} ${esc(f.date)}</b> ${esc(f.airline)}<br>${esc(f.from)} ${f.dep} → ${esc(f.to)} ${f.arr}</p>`).join('') +
+      `<p><b>차량</b> ${esc(T.vehicle.title)} (상하이↔항저우 약 3시간)</p>` +
+      T.hotels.map((x, i) => `<p><b>${esc(x.city)}</b> ${esc(x.nights)}<br>${esc(x.ko)}<br><span class="muted">${esc(x.addr)}</span><br><a href="tel:${tel(x.tel)}">📞 ${esc(x.tel)}</a> · <a href="#" data-act="taxi" data-kind="hotel" data-i="${i}">🚕 중국어 주소</a></p>`).join(''))}
+    ${fold('🚨', 'c2', '비상 연락처', '총영사관 · 경찰 110 · 구급 120',
+      T.emergency.map(e => `<p class="em"><span>${esc(e.k)}</span><a class="btn small line" href="tel:${tel(e.v)}">📞 ${esc(e.v)}</a></p>`).join(''))}
+    ${fold('💱', 'c3', '환율 · 날씨 · 시차', `1위안 ≈ ${T.rate}원 · 중국이 1시간 느림`,
+      `<p>1위안 = <b>${T.rate}원</b> (11.16. 기준) · 중국은 한국보다 <b>1시간 느림</b></p>
+      <label class="f">위안 → 원<input class="inp" id="cny" inputmode="decimal" placeholder="위안 입력"></label><p class="big" id="krwOut"></p>` +
+      T.weather.map(w => `<p>🌤️ ${w.city}: 평균 ${w.low}°~${w.high}°, 강수 ${w.rain}</p>`).join(''))}
+    ${fold('📚', 'c4', '참고: 중국 교육 동향', `AI+교육 행동계획 등 ${T.edu.trends.length}가지 · PISA`,
+      T.edu.trends.map((t, i) => `<p><b>${i + 1}. ${esc(t.t)}</b><br>${esc(t.d)}</p>`).join('') +
+      `<p><b>학제</b> 초6·중3·고3 (상하이 초5·중4) · 의무교육 9년 · 대입 가오카오</p><p>${esc(T.edu.pisa)}</p>`)}
+    ${fold('👥', 'c5', '업무분장', `${T.members.map(m => m.role.split('·')[0]).join(' · ')}`,
+      T.members.map(m => `<p><b>${esc(m.role)}</b> ${esc(m.name)}<br><span class="muted">${m.duty.map(esc).join(' · ')}</span></p>`).join(''))}
+    </div>
     <footer class="org-foot"><img src="img/logo-wide.jpg" alt="부산광역시교육청" loading="lazy"><span>초등교육과 · 2026 상하이교육위원회 정기 방문</span></footer>`;
   };
 
@@ -201,7 +228,7 @@
     <div class="org-head"><span class="no">${o.no}</span><div><h2 class="ph2" style="margin:0">${esc(o.name)}</h2>
       <small class="muted">${esc(o.time)}${o.cn ? ` · <span class="cn">${esc(o.cn)}</span>` : ''}</small></div></div>
     ${o.cn ? `<div class="btn-row"><button class="btn line small" data-act="taxi" data-kind="org" data-id="${o.id}">🚕 기관명 크게 보기</button></div>` : ''}
-    ${o.desc.length ? `<details class="card fold"><summary>ℹ️ 기관 소개</summary>${o.img ? `<img class="cover" src="${o.img}" alt="" loading="lazy">` : ''}<ul>${o.desc.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details>` : ''}
+    ${o.desc.length ? fold('ℹ️', 'c1', '기관 소개', `${esc(o.en)} · 사진과 주요 특징`, `${o.img ? `<img class="cover" src="${o.img}" alt="" loading="lazy" decoding="async">` : ''}<ul>${o.desc.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`) : ''}
 
     ${o.q.length || questions(o).length ? `<h3 class="sec">💬 질의 · 답변</h3>
     ${questions(o).map((x, i) => `<div class="qa-item ${v(`qa:${x.id}:a`).trim() ? 'done' : ''}">
@@ -300,7 +327,7 @@
     <a class="btn" href="#home">일정 보기</a></div>`;
 
   /* =================== 사진 =================== */
-  function resize(file, max = 1600, q = 0.8) {
+  function resize(file, max = 1280, q = 0.78) {
     return new Promise((res, rej) => {
       const url = URL.createObjectURL(file); const img = new Image();
       img.onload = () => {
@@ -315,36 +342,52 @@
   }
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
   async function upload(files, orgId) {
-    const list = Array.from(files); let ok = 0;
+    const list = Array.from(files); let ok = 0, badFile = 0, netFail = 0;
     const o = orgById(orgId);
     for (let i = 0; i < list.length; i++) {
       toast(`사진 올리는 중… ${i + 1}/${list.length}`, 120000);
       try {
-        const blob = await resize(list[i]);
+        let blob; try { blob = await resize(list[i]); } catch (e1) { badFile++; continue; } // 사진이 아니거나 열 수 없는 파일
         const id = uuid(); const path = `${T.id}/${orgId}/${id}.jpg`;
         const r = await fetch(`${BASE}/storage/v1/object/${BUCKET}/${path}`, { method: 'POST', headers: headers({ 'Content-Type': 'image/jpeg', 'x-upsert': 'true' }), body: blob });
         if (!r.ok) throw new Error(await r.text());
         const row = await sb('/rest/v1/photos', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ id, trip: T.id, org: orgId, day: o.day, caption: '', path, author: myName() }) });
         PH.push(row[0]); ok++;
-      } catch (e) { /* 다음 사진 계속 */ }
+      } catch (e) { netFail++; } // 전송 실패
     }
     ls.set('tm2-photos-' + T.id, PH);
-    toast(ok === list.length ? `사진 ${ok}장 저장 완료` : `${ok}장 저장 · ${list.length - ok}장 실패 (인터넷 확인 후 다시 올려 주세요)`, 3500);
+    toast(ok === list.length ? `사진 ${ok}장 저장 완료` : [`${ok}장 저장`, badFile ? `${badFile}장은 열 수 없는 파일` : '', netFail ? `${netFail}장 전송 실패(인터넷 확인 후 다시)` : ''].filter(Boolean).join(' · '), 4000);
     render();
   }
 
   /* =================== 라우터 =================== */
   let cur = 'home';
-  function render() {
-    const [page, param] = (location.hash.replace(/^#/, '') || 'home').split('/');
+  let lastRoute = '';
+  function render(animate) {
+    const route = location.hash.replace(/^#/, '') || 'home';
+    const [page, param] = route.split('/');
     cur = pages[page] ? page : 'home';
+    // 같은 화면을 다시 그릴 때는 펼친 카드·스크롤 위치를 그대로 유지
+    const same = route === lastRoute;
+    const openIdx = same ? $$('details', app).map((d, i) => d.open ? i : -1).filter(i => i >= 0) : [];
+    const y = window.scrollY;
     const needDb = ['orgs', 'org', 'daily', 'report'].includes(cur);
     app.innerHTML = needDb && !READY ? setupPage() : pages[cur](param);
+    if (same) { const ds = $$('details', app); openIdx.forEach(i => { if (ds[i]) ds[i].open = true; }); window.scrollTo(0, y); }
+    lastRoute = route;
     $$('.bottom-nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === (cur === 'org' ? 'orgs' : cur)));
-    $$('textarea.inp', app).forEach(grow);
+    growAll();
+    if (animate) { app.classList.remove('page-in'); void app.offsetWidth; app.classList.add('page-in'); }
   }
   function grow(t) { t.style.height = 'auto'; t.style.height = Math.max(t.scrollHeight + 4, 90) + 'px'; }
-  window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); if (READY) pull().then(() => { if (!isTyping()) render(); }); });
+  function growAll() { // 읽기→쓰기를 한꺼번에 해서 화면 재계산을 최소화
+    const ts = $$('textarea.inp', app);
+    ts.forEach(t => { t.style.height = 'auto'; });
+    const hs = ts.map(t => Math.max(t.scrollHeight + 4, 90));
+    ts.forEach((t, i) => { t.style.height = hs[i] + 'px'; });
+  }
+  const refresh = () => pull().then(changed => { if (changed && !isTyping()) render(false); });
+  window.addEventListener('hashchange', () => { render(true); window.scrollTo(0, 0); if (READY) refresh(); });
 
   /* =================== 이벤트 =================== */
   app.addEventListener('input', e => {
@@ -449,7 +492,7 @@
 
   /* =================== 시작 =================== */
   setFs(document.documentElement.dataset.fs || '1'); // 기본: 가장 작은 글씨
-  showWho(); syncStatus(); render();
-  if (READY) { pull().then(() => { if (!isTyping()) render(); push(); }); if (!myName()) openName(); }
+  showWho(); syncStatus(); render(true);
+  if (READY) { refresh().then(() => push()); if (!myName()) openName(); }
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

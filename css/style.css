@@ -417,3 +417,58 @@ body { padding-bottom: calc(70px + var(--lane) + 16px + env(safe-area-inset-bott
 .fs-btns button[data-fs="2"] { font-size: 12px; }
 .fs-btns button[data-fs="3"] { font-size: 14px; }
 @media (max-width: 480px) { .fs-btns { padding: 2px; gap: 1px; } .fs-btns button { min-width: 24px; height: 24px; } }
+
+/* ================= 메뉴 가독성 · 애니메이션 ================= */
+/* 접이식 카드 */
+.fold-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.fold-group .fold { margin: 0; }
+.fold { overflow: hidden; transition: box-shadow .2s ease, border-color .2s ease; border-left: 5px solid transparent; }
+.fold:hover { box-shadow: 0 6px 18px rgba(31,39,71,.12); }
+.fold[open] { border-left-color: var(--accent); box-shadow: 0 6px 18px rgba(31,39,71,.12); }
+.fold > summary { display: flex; align-items: center; gap: 14px; padding: 14px 16px; min-height: 72px; color: var(--ink); -webkit-tap-highlight-color: transparent; transition: background .15s ease; }
+.fold > summary::after { content: none; }
+.fold > summary:active { background: var(--navy-l); }
+.fold[open] > summary { background: #f7f8fc; border-bottom: 1px solid var(--line); }
+.f-ico { flex: 0 0 auto; width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; transition: transform .25s ease; }
+.fold[open] .f-ico { transform: scale(1.06) rotate(-4deg); }
+.f-ico.c1 { background: #e6edff; } .f-ico.c2 { background: #ffe6e3; } .f-ico.c3 { background: #e3f6ec; }
+.f-ico.c4 { background: #fff3d6; } .f-ico.c5 { background: #efe6ff; }
+.f-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.f-txt b { font-size: 1.02rem; color: var(--navy-d); line-height: 1.3; }
+.f-txt small { font-size: .8rem; color: var(--muted); font-weight: 500; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f-chev { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; background: var(--navy-l); position: relative; transition: transform .3s cubic-bezier(.3,1.4,.5,1), background .2s; }
+.f-chev::before { content: ""; position: absolute; left: 50%; top: 45%; width: 9px; height: 9px; border-right: 2.5px solid var(--navy); border-bottom: 2.5px solid var(--navy); transform: translate(-50%,-50%) rotate(45deg); }
+.fold[open] .f-chev { transform: rotate(180deg); background: var(--accent); }
+.fold[open] .f-chev::before { border-color: #fff; }
+.fold-body { padding: 6px 0 4px; }
+.fold[open] .fold-body { animation: foldIn .32s ease both; }
+@keyframes foldIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+
+/* 화면 전환: 카드가 부드럽게 올라오며 등장 */
+.page-in > * { animation: rise .32s ease both; }
+.page-in > *:nth-child(2) { animation-delay: .03s; } .page-in > *:nth-child(3) { animation-delay: .06s; }
+.page-in > *:nth-child(4) { animation-delay: .09s; } .page-in > *:nth-child(5) { animation-delay: .12s; }
+.page-in > *:nth-child(n+6) { animation-delay: .15s; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* 기관 목록·버튼 눌림 반응 */
+.org-row, .btn, .day-tabs button { transition: transform .12s ease, box-shadow .2s ease, background .2s ease; }
+.org-row:active, .btn:active, .day-tabs button:active { transform: scale(.97); }
+.org-row:hover { box-shadow: 0 6px 18px rgba(31,39,71,.12); }
+
+/* 하단 메뉴: 선택 표시 막대 + 아이콘 튀어오름 */
+.bottom-nav a { position: relative; transition: color .2s ease, background .2s ease; -webkit-tap-highlight-color: transparent; font-size: .8rem; }
+.bottom-nav a::before { content: ""; position: absolute; top: 0; left: 50%; width: 0; height: 4px; border-radius: 0 0 4px 4px; background: var(--accent); transform: translateX(-50%); transition: width .25s ease; }
+.bottom-nav a.on::before { width: 46%; }
+.bottom-nav a.on { color: var(--navy-d); font-weight: 800; }
+.bottom-nav a .ico { transition: transform .25s cubic-bezier(.3,1.6,.5,1); }
+.bottom-nav a.on .ico { transform: translateY(-2px) scale(1.15); }
+
+/* 저장 상태 변화 깜빡임 */
+.sync.flash { animation: flash .6s ease; }
+@keyframes flash { 0% { background: #c9ecd7; } 100% { background: #f1f3f8; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+.fold > summary::after, .fold[open] > summary::after { content: none !important; display: none; }
