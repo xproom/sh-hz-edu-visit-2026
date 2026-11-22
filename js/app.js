@@ -15,6 +15,7 @@
   const hhmm = (d = new Date()) => pad(d.getHours()) + ':' + pad(d.getMinutes());
   const app = $('#app');
 
+  let HEADER = null; // 한글 파일 서식 (처음 만들 때 한 번 받아 둠)
   const ETC = { id: 'etc', no: '+', name: '문화체험 · 기타', cn: '', en: '', time: '일정 중 자유 기록', city: '', day: null, desc: [], q: [] };
   const ORGS = T.orgs.concat([ETC]);
   const orgById = id => ORGS.find(o => o.id === id);
@@ -149,8 +150,6 @@
   // 기록자 표시: 내용 바로 아래 "✍️ 이름 · 시각"
   const writerText = k => E[k] && (E[k].value || '').trim() ? `✍️ ${E[k].author || '이름 없음'} · ${fmtTs(E[k].updated_at)}` : '';
   // 보고서·공유용: 내용 뒤에 (성명)
-  const sig = k => E[k] && (E[k].value || '').trim() && E[k].author ? ` (${E[k].author})` : '';
-  const withSig = k => v(k).trim() ? v(k).trim() + sig(k) : '';
   function area(key, label, ph, rows = 4) {
     return `<label class="f">${label}<textarea class="inp" rows="${rows}" data-key="${key}" placeholder="${esc(ph || '')}">${esc(v(key))}</textarea></label><div class="writer" data-w="${key}">${esc(writerText(key))}</div>`;
   }
@@ -270,19 +269,6 @@
   };
 
   /* --- 일일보고 --- */
-  function dailyText(n) {
-    const d = T.days[n - 1];
-    const L = [`[상하이 출장 ${n}일차 일일보고] ${d.label} ${d.city}`, '■ 일정', d.items.map(i => `${i.t} ${i.what}`).join('\n')];
-    if (v(`daily:${n}:summary`)) L.push('■ 주요 내용', withSig(`daily:${n}:summary`));
-    T.orgs.filter(o => o.day === n).forEach(o => {
-      const qs = questions(o).filter(x => v(`qa:${x.id}:a`).trim());
-      if (qs.length) { L.push(`■ ${o.name} 질의응답`); qs.forEach(x => L.push(`Q. ${x.q}\nA. ${withSig(`qa:${x.id}:a`)}`)); }
-      if (v(`note:${o.id}:summary`).trim()) L.push(`■ ${o.name} 메모`, withSig(`note:${o.id}:summary`));
-    });
-    if (v(`daily:${n}:insight`)) L.push('■ 시사점', withSig(`daily:${n}:insight`));
-    if (v(`daily:${n}:issue`)) L.push('■ 특이사항·건의', withSig(`daily:${n}:issue`));
-    return L.join('\n');
-  }
   // '보고' 탭 안의 [일일보고 | 결과보고서] 전환
   const reportTabs = active => `<div class="seg no-print" role="tablist">
     <a href="#daily" role="tab" aria-selected="${active === 'daily'}" class="${active === 'daily' ? 'on' : ''}">📅 일일보고</a>
@@ -301,57 +287,120 @@
       ${area(`daily:${n}:summary`, `오늘 주요 내용 ${goesTo('Ⅱ. 일자별 활동')}`, '오늘 있었던 일, 성과', 5)}
       ${area(`daily:${n}:insight`, `시사점 · 배운 점 ${goesTo('Ⅳ. 주요 시사점')}`, '부산교육에 참고할 점, 배운 점', 3)}
       ${area(`daily:${n}:issue`, `특이사항 · 건의 ${goesTo('Ⅱ. 비고')}`, '일정 변경, 건강, 건의 등 (선택)', 2)}
-      <div class="btn-row"><a class="btn" href="#report/day${n}">📄 결과보고서에서 ${n}일차 보기</a>
-      <button class="btn line small" data-act="share" data-n="${n}">카톡 공유 (선택)</button></div></div>`;
+      <div class="btn-row"><a class="btn" href="#report/day${n}">📄 결과보고서에서 ${n}일차 보기</a></div></div>`;
   };
 
-  /* --- 결과 보고서 --- */
+  /* --- 결과 보고서 (공문서 형식) ---
+     내용을 한 번만 정리(reportModel)해서 화면·PDF(HTML)와 한글 파일(HWPX)에 똑같이 사용 */
   const rv = (k, d) => v('report:' + k).trim() || d || '';
-  const emp = '<span class="empty">(미작성)</span>';
-  const cell = s => (s || '').trim() ? nl2br(s.trim()) : emp;
-  function buildReport() {
-    const d = new Date();
-    const title = rv('title', `2026년 ${T.title} 공무국외출장 결과보고서`);
-    // Ⅳ 주요 시사점 = 기관 메모의 시사점 + 일일보고의 시사점 (자동 모음)
-    const insights = T.orgs.map(o => v(`note:${o.id}:insight`).trim() ? `○ (${o.name}) ${withSig(`note:${o.id}:insight`)}` : '')
-      .concat(T.days.map(x => v(`daily:${x.n}:insight`).trim() ? `○ (${x.n}일차) ${withSig(`daily:${x.n}:insight`)}` : ''))
-      .filter(Boolean).join('\n');
-    return { title, html: `<div class="rep-logo"><img src="${new URL('img/logo-wide.jpg', location.href).href}" alt="부산광역시교육청" width="220"></div><h1>${esc(title)}</h1><div class="rep-org">${esc(T.org)} · ${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.</div>
-    <h2>Ⅰ. 출장 개요</h2><table>
-      <tr><th>목적</th><td>${T.purpose.map(esc).join('<br>')}</td></tr>
-      <tr><th>기간</th><td>2026. 11. 29.(일) ~ 12. 3.(목) [${T.nights}]</td></tr>
-      <tr><th>장소</th><td>${esc(T.region)}</td></tr>
-      <tr><th>출장자</th><td>${T.members.map(m => `${esc(m.role)}: ${esc(m.name)}`).join('<br>')}</td></tr>
-      <tr><th>방문 기관</th><td>${T.orgs.map(o => `${o.no}. ${esc(o.name)}`).join('<br>')}</td></tr></table>
-    <h2>Ⅱ. 일자별 활동</h2><table><tr><th style="width:18%">일자</th><th>주요 일정</th><th>활동 내용</th></tr>
-      ${T.days.map(x => `<tr id="rep-day${x.n}"><td>${x.n}일차<br>${x.label}</td><td>${x.items.map(i => `${esc(i.t)} ${esc(i.what)}`).join('<br>')}</td><td>${cell(withSig(`daily:${x.n}:summary`))}${v(`daily:${x.n}:issue`).trim() ? `<br><br><b>[비고]</b> ${nl2br(withSig(`daily:${x.n}:issue`))}` : ''}</td></tr>`).join('')}</table>
-    <h2>Ⅲ. 기관별 방문 결과</h2>
-    ${T.orgs.map(o => `<h3>${o.no}. ${esc(o.name)} (${esc(o.cn)})</h3><table>
-      <tr><th>일시</th><td>${esc(o.time)}</td></tr>
-      <tr><th>기관 개요</th><td>${o.desc.map(esc).join('<br>')}</td></tr>
-      <tr><th>주요 내용</th><td>${cell(withSig(`note:${o.id}:summary`))}</td></tr>
-      <tr><th>시사점</th><td>${cell(withSig(`note:${o.id}:insight`))}</td></tr>
-      <tr><th>질의 응답</th><td>${questions(o).map((x, i) => `<b>Q${i + 1}. ${esc(x.q)}</b><br>A. ${cell(withSig(`qa:${x.id}:a`))}`).join('<br><br>')}</td></tr></table>
-      ${PH.filter(p => p.org === o.id).length ? `<div class="rep-photos">${PH.filter(p => p.org === o.id).slice(0, 4).map(p => `<figure><img src="${photoUrl(p)}" alt=""><figcaption>${esc(p.caption || o.name)}</figcaption></figure>`).join('')}</div>` : ''}`).join('')}
-    <h2>Ⅳ. 종합 의견 및 시사점</h2><p>${cell(v('report:overall'))}</p>${insights ? `<p>${nl2br(insights)}</p>` : ''}
-    <h2>Ⅴ. 부산교육 정책 제언</h2><p>${cell(v('report:suggest'))}</p>
-    <h2>Ⅵ. 향후 계획</h2><p>${cell(v('report:plan'))}</p>
-    ${PH.filter(p => p.org === 'etc').length ? `<h2>붙임. 문화체험 사진</h2><div class="rep-photos">${PH.filter(p => p.org === 'etc').map(p => `<figure><img src="${photoUrl(p)}" alt=""><figcaption>${esc(p.caption)}</figcaption></figure>`).join('')}</div>` : ''}` };
+  const MISSING = '(미작성)';
+  const author = k => (E[k] && (E[k].value || '').trim() && E[k].author) || '';
+  // 여러 줄 글 → 줄 목록 (앞에 이미 붙은 기호는 떼어 내고 공문서 기호로 통일)
+  const linesOf = s => String(s || '').split('\n').map(l => l.trim().replace(/^([-–·•○◦▪□■※]|\d+[.)])\s*/, '')).filter(Boolean);
+  const pushLines = (M, t, sym, key, emptyText) => {
+    const ls = linesOf(v(key)); const who = author(key);
+    if (!ls.length) { if (emptyText) M.push({ t, text: sym + emptyText }); return; }
+    ls.forEach((l, i) => M.push({ t, text: sym + l, sig: i === ls.length - 1 ? who : '' }));
+  };
+  const weekday = d => '일월화수목금토'[d.getDay()];
+  function reportModel() {
+    const d = new Date(), M = [];
+    const title = rv('title', `2026년 ${T.title}\n공무국외출장 결과 보고`);
+    M.push({ t: 'title', text: title });
+    M.push({ t: 'date', text: `${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.(${weekday(d)}) / ${T.org}` });
+    // Ⅰ. 출장 개요
+    M.push({ t: 'h1', text: 'Ⅰ. 출장 개요' });
+    M.push({ t: 'sq', label: '□ ', text: '목    적' });
+    T.purpose.forEach(p => M.push({ t: 'ci', text: '○ ' + p }));
+    M.push({ t: 'sq', label: '□ ', text: `기    간 : 2026. 11. 29.(일) ~ 12. 3.(목) [${T.nights}]` });
+    M.push({ t: 'sq', label: '□ ', text: `장    소 : ${T.region}` });
+    M.push({ t: 'sq', label: '□ ', text: `출 장 자 : ${T.party || ''}` });
+    T.members.forEach(m => M.push({ t: 'ci', text: `○ ${m.role} : ${m.name}` }));
+    M.push({ t: 'sq', label: '□ ', text: `방문기관 : ${T.orgs.length}개 기관` });
+    ['상하이', '항저우'].forEach(c => M.push({ t: 'ci', text: `○ (${c}) ` + T.orgs.filter(o => o.city === c).map(o => o.name).join(', ') }));
+    // Ⅱ. 일자별 주요 활동
+    M.push({ t: 'h1', text: 'Ⅱ. 일자별 주요 활동' });
+    M.push({ t: 'table', id: 'days', widths: [24, 70, 76], head: ['일 자', '주요 일정', '활동 내용'],
+      rows: T.days.map(x => {
+        const sum = linesOf(v(`daily:${x.n}:summary`)), iss = linesOf(v(`daily:${x.n}:issue`));
+        let act = sum.length ? sum.join('\n') + (author(`daily:${x.n}:summary`) ? ` (${author(`daily:${x.n}:summary`)})` : '') : MISSING;
+        if (iss.length) act += '\n[비고] ' + iss.join(' / ') + (author(`daily:${x.n}:issue`) ? ` (${author(`daily:${x.n}:issue`)})` : '');
+        return [{ text: `${x.n}일차\n${x.label}`, align: 'center', rowId: `rep-day${x.n}` }, x.items.map(i => `${i.t} ${i.what}`).join('\n'), act];
+      }) });
+    // Ⅲ. 기관별 방문 결과
+    M.push({ t: 'h1', text: 'Ⅲ. 기관별 방문 결과' });
+    T.orgs.forEach(o => {
+      M.push({ t: 'sq', label: '□ ', text: `${o.no}. ${o.name} (${o.cn})` });
+      M.push({ t: 'ci', text: `○ 일    시 : ${o.time}` });
+      M.push({ t: 'ci', text: '○ 기관 개요' });
+      o.desc.forEach(x => M.push({ t: 'da', text: '- ' + x }));
+      M.push({ t: 'ci', text: '○ 주요 내용' });
+      pushLines(M, 'da', '- ', `note:${o.id}:summary`, MISSING);
+      M.push({ t: 'ci', text: '○ 시사점 및 적용 방안' });
+      pushLines(M, 'da', '- ', `note:${o.id}:insight`, MISSING);
+      const qs = questions(o);
+      if (qs.length) {
+        M.push({ t: 'ci', text: '○ 정책 질의·응답' });
+        qs.forEach(q => {
+          M.push({ t: 'da', text: '- (질의) ' + q.q });
+          const a = linesOf(v(`qa:${q.id}:a`)), who = author(`qa:${q.id}:a`);
+          // 답변이 여러 줄이어도 한 문단으로 이어 써서 줄 맞춤 유지
+          M.push({ t: 'note', text: '→ (답변) ' + (a.length ? a.join(' ') : MISSING), sig: a.length ? who : '' });
+        });
+      }
+    });
+    // Ⅳ. 종합 의견 및 시사점
+    M.push({ t: 'h1', text: 'Ⅳ. 종합 의견 및 시사점' });
+    M.push({ t: 'sq', label: '□ ', text: '종합 의견' });
+    pushLines(M, 'ci', '○ ', 'report:overall', MISSING);
+    M.push({ t: 'sq', label: '□ ', text: '주요 시사점' });
+    let anyIns = false;
+    T.orgs.forEach(o => { const k = `note:${o.id}:insight`; linesOf(v(k)).forEach((l, i, a) => { anyIns = true; M.push({ t: 'ci', text: `○ (${o.name}) ${l}`, sig: i === a.length - 1 ? author(k) : '' }); }); });
+    T.days.forEach(x => { const k = `daily:${x.n}:insight`; linesOf(v(k)).forEach((l, i, a) => { anyIns = true; M.push({ t: 'ci', text: `○ (${x.n}일차) ${l}`, sig: i === a.length - 1 ? author(k) : '' }); }); });
+    if (!anyIns) M.push({ t: 'ci', text: '○ ' + MISSING });
+    // Ⅴ. 정책 제언, Ⅵ. 향후 계획
+    M.push({ t: 'h1', text: 'Ⅴ. 부산교육 정책 제언' });
+    pushLines(M, 'ci', '○ ', 'report:suggest', MISSING);
+    M.push({ t: 'h1', text: 'Ⅵ. 향후 계획' });
+    pushLines(M, 'ci', '○ ', 'report:plan', MISSING);
+    return { title: title.replace(/\n/g, ' '), model: M };
+  }
+  // 모델 → 화면/PDF용 HTML (사진 붙임 포함)
+  function reportHtml() {
+    const { model } = reportModel();
+    const sig = b => b.sig ? ` <span class="k-sig">(${esc(b.sig)})</span>` : '';
+    const txt = s => s === MISSING || /\(미작성\)$/.test(s) ? esc(s).replace('(미작성)', '<span class="empty">(미작성)</span>') : esc(s);
+    let h = `<div class="rep-logo"><img src="${new URL('img/logo-wide.jpg', location.href).href}" alt="부산광역시교육청" width="200"></div>`;
+    model.forEach(b => {
+      if (b.t === 'title') h += `<div class="k-title">${nl2br(b.text)}</div>`;
+      else if (b.t === 'date') h += `<div class="k-date">${esc(b.text)}</div>`;
+      else if (b.t === 'h1') h += `<h2 class="k-h1">${esc(b.text)}</h2>`;
+      else if (b.t === 'table') {
+        h += `<table class="k-tbl"><colgroup>${b.widths.map(w => `<col style="width:${w / 1.7}%">`).join('')}</colgroup><tr>${b.head.map(x => `<th>${esc(x)}</th>`).join('')}</tr>`
+          + b.rows.map(r => `<tr${r[0].rowId ? ` id="${r[0].rowId}"` : ''}>` + r.map(c => { const o = typeof c === 'object' ? c : { text: c }; return `<td class="${o.align === 'center' ? 'c' : ''}">${txt(o.text).replace(/\n/g, '<br>')}</td>`; }).join('') + '</tr>').join('') + '</table>';
+      } else h += `<p class="k-${b.t}">${b.label ? `<b>${esc(b.label)}</b>` : ''}${txt(b.text)}${sig(b)}</p>`;
+    });
+    const photos = PH.filter(p => p.org !== 'etc'), etc = PH.filter(p => p.org === 'etc');
+    if (PH.length) {
+      h += '<h2 class="k-h1">붙임. 방문 사진</h2><div class="rep-photos">'
+        + photos.concat(etc).map(p => `<figure><img src="${photoUrl(p)}" alt=""><figcaption>${esc((orgById(p.org) || ETC).name)}${p.caption ? ' – ' + esc(p.caption) : ''}</figcaption></figure>`).join('') + '</div>';
+    }
+    return h;
   }
   pages.report = () => {
     const done = T.orgs.filter(o => v(`note:${o.id}:summary`).trim()).length;
     const qa = T.orgs.reduce((s, o) => { const g = orgProgress(o); return [s[0] + g.a, s[1] + g.q]; }, [0, 0]);
     return `${reportTabs('report')}<div class="no-print">
-      <p class="muted">일일보고·기관 기록·사진이 자동으로 모입니다. 아래 3칸만 채우면 완성됩니다.</p>
+      <p class="muted">일일보고·기관 기록·사진이 공문서 형식으로 자동으로 모입니다. 아래 3칸만 채우면 완성됩니다.</p>
       <div class="card"><p style="margin:0 0 8px"><b>일일보고</b> ${T.days.map(x => `<a class="day-chip ${dayDone(x.n) ? 'ok' : ''}" href="#daily/${x.n}">${dayDone(x.n) ? '✅' : '⬜'} ${x.n}일차</a>`).join(' ')}</p>
         <p style="margin:0">기관 메모 <b>${done}/${T.orgs.length}</b> · 질의 답변 <b>${qa[0]}/${qa[1]}</b> · 사진 <b>${PH.length}장</b></p></div>
-      ${area('report:overall', 'Ⅳ. 종합 의견', '이번 방문의 총평', 5)}
-      ${area('report:suggest', 'Ⅴ. 부산교육 정책 제언', '', 5)}
-      ${area('report:plan', 'Ⅵ. 향후 계획', '예: 결과보고회, 교류협력 추진 등', 3)}
-      <div class="btn-row" style="margin:16px 0"><button class="btn" data-act="go" data-to="report">🔄 미리보기 새로고침</button>
-      <button class="btn orange" data-act="print">🖨️ PDF 저장 · 인쇄</button><button class="btn line" data-act="doc">⬇ 워드 파일</button></div>
-      <p class="muted" style="font-size:.8rem">※ 보고서 다듬기는 PC에서 하시는 것이 편합니다. 워드 파일은 한글(HWP)에서도 열립니다.</p></div>
-    <div class="sheet" id="sheet">${buildReport().html}</div>`;
+      ${area('report:overall', 'Ⅳ. 종합 의견', '이번 방문의 총평 (줄마다 ○ 항목이 됩니다)', 5)}
+      ${area('report:suggest', 'Ⅴ. 부산교육 정책 제언', '줄마다 ○ 항목이 됩니다', 5)}
+      ${area('report:plan', 'Ⅵ. 향후 계획', '예: 결과보고회 개최, 교류협력 추진', 3)}
+      <div class="btn-row" style="margin:16px 0"><button class="btn orange" data-act="hwpx">⬇ 한글 파일 (HWPX)</button>
+      <button class="btn" data-act="print">🖨️ PDF 저장 · 인쇄</button><button class="btn line" data-act="go" data-to="report">🔄 미리보기 새로고침</button></div>
+      <p class="muted" style="font-size:.8rem">※ 한글 파일은 공문서 형식(HY헤드라인M·휴먼명조, □·○·- 항목)으로 만들어져 한글에서 바로 고칠 수 있습니다. 사진은 PDF 저장에 함께 들어갑니다.</p></div>
+    <div class="sheet k-doc" id="sheet">${reportHtml()}</div>`;
   };
 
   /* 설정 안 됨 화면 */
@@ -502,19 +551,19 @@
       } catch (e2) { toast('삭제 실패 – 인터넷을 확인해 주세요'); }
       return;
     }
-    if (a === 'share') {
-      await push(); const text = dailyText(+el.dataset.n);
-      if (navigator.share) { try { await navigator.share({ text }); return; } catch (e2) { if (e2.name === 'AbortError') return; } }
-      try { await navigator.clipboard.writeText(text); toast('복사했습니다. 카톡에 붙여넣기 하세요', 3000); } catch (e3) { toast('복사 실패'); }
-      return;
-    }
     if (a === 'print') { await push(); window.print(); return; }
-    if (a === 'doc') {
-      await push(); const r = buildReport();
-      const css = `body{font-family:'맑은 고딕',sans-serif;font-size:11pt;line-height:1.6}h1{text-align:center;font-size:18pt;border:3px double #000;padding:8pt}h2{font-size:14pt;border-bottom:1.5pt solid #000}table{border-collapse:collapse;width:100%}th,td{border:1px solid #555;padding:4pt 6pt;vertical-align:top;text-align:left}th{background:#e9ecf4;width:20%}.rep-org{text-align:center}.empty{color:#999}figure{display:inline-block;width:45%;margin:4pt}img{width:300px}figcaption{font-size:9pt}`;
-      const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><style>${css}</style></head><body>${r.html}</body></html>`;
-      const aEl = document.createElement('a'); aEl.href = URL.createObjectURL(new Blob(['﻿', html], { type: 'application/msword' }));
-      aEl.download = r.title.replace(/[\\/:*?"<>|]/g, '') + '.doc'; document.body.appendChild(aEl); aEl.click(); aEl.remove();
+    if (a === 'hwpx') { // 공문서 형식 한글 파일 만들기
+      await push();
+      try {
+        if (!HEADER) HEADER = await (await fetch('hwpx/header.xml?v=25')).text();
+        const r = reportModel();
+        const bytes = HWPX.build(r.model, HEADER, { title: r.title, creator: myName() || T.org });
+        const aEl = document.createElement('a');
+        aEl.href = URL.createObjectURL(new Blob([bytes], { type: 'application/hwp+zip' }));
+        aEl.download = r.title.replace(/[\\/:*?"<>|]/g, '') + '.hwpx'; document.body.appendChild(aEl); aEl.click(); aEl.remove();
+        setTimeout(() => URL.revokeObjectURL(aEl.href), 4000);
+        toast('한글 파일을 만들었습니다');
+      } catch (e2) { toast('한글 파일 만들기 실패 – 인터넷 연결을 확인해 주세요'); }
       return;
     }
   });

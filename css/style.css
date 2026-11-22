@@ -507,3 +507,29 @@ body { padding-bottom: calc(70px + var(--lane) + 16px + env(safe-area-inset-bott
 .sheet tr.hl td { animation: hl 2.4s ease; }
 @keyframes hl { 0%, 40% { background: #fff1a8; } 100% { background: transparent; } }
 @media print { .seg { display: none !important; } }
+
+/* ================= 결과보고서: 공문서 형식 미리보기·인쇄 ================= */
+.k-doc { font-family: "휴먼명조", "HCR Batang", "함초롬바탕", "Batang", "바탕", "Noto Serif KR", serif; font-size: 15px; line-height: 1.6; color: #000; padding: 28px 26px; }
+.k-doc .rep-logo { text-align: center; margin-bottom: 14px; }
+.k-title { font-family: "HY헤드라인M", "HYHeadLine M", "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 24px; font-weight: 700; text-align: center; line-height: 1.45; border-top: 3px solid #000; border-bottom: 3px solid #000; padding: 14px 6px; margin-bottom: 8px; }
+.k-date { text-align: right; font-size: 13px; margin-bottom: 22px; }
+.k-doc .k-h1 { font-family: "HY헤드라인M", "HYHeadLine M", "Malgun Gothic", sans-serif; font-size: 18px; border: 0; margin: 26px 0 10px; padding: 0; }
+.k-doc p { margin: 0; }
+.k-sq { font-weight: 700; padding-left: 1.55em; text-indent: -1.55em; margin-top: 10px !important; }
+.k-ci { padding-left: 2.6em; text-indent: -1.55em; margin-top: 4px !important; }
+.k-da { padding-left: 3.9em; text-indent: -1.3em; font-size: 14px; margin-top: 2px !important; }
+.k-note { padding-left: 3.9em; text-indent: -1.3em; font-size: 13px; color: #222; margin-top: 2px !important; }
+.k-sig { font-size: 12px; color: #555; }
+.k-tbl { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 13px; line-height: 1.45; }
+.k-tbl th, .k-tbl td { border: 1px solid #000; padding: 6px 8px; vertical-align: middle; text-align: left; }
+.k-tbl th { background: #E7E6E6; text-align: center; font-weight: 700; width: auto; }
+.k-tbl td.c { text-align: center; white-space: nowrap; }
+@media (max-width: 480px) { .k-doc { padding: 16px 12px; font-size: 14px; } .k-title { font-size: 19px; } .k-tbl { font-size: 12px; } }
+@media print {
+  @page { size: A4; margin: 20mm 20mm 15mm 20mm; }
+  .k-doc { font-size: 15pt; padding: 0; }
+  .k-title { font-size: 22pt; } .k-date { font-size: 13pt; } .k-doc .k-h1 { font-size: 16pt; break-after: avoid; }
+  .k-da { font-size: 14pt; } .k-note, .k-tbl { font-size: 12pt; }
+  .k-tbl tr { break-inside: avoid; }
+}
+.k-sq { white-space: pre-wrap; }
