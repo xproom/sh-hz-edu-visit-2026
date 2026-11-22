@@ -280,18 +280,29 @@
       if (v(`note:${o.id}:summary`).trim()) L.push(`■ ${o.name} 메모`, withSig(`note:${o.id}:summary`));
     });
     if (v(`daily:${n}:insight`)) L.push('■ 시사점', withSig(`daily:${n}:insight`));
+    if (v(`daily:${n}:issue`)) L.push('■ 특이사항·건의', withSig(`daily:${n}:issue`));
     return L.join('\n');
   }
+  // '보고' 탭 안의 [일일보고 | 결과보고서] 전환
+  const reportTabs = active => `<div class="seg no-print" role="tablist">
+    <a href="#daily" role="tab" aria-selected="${active === 'daily'}" class="${active === 'daily' ? 'on' : ''}">📅 일일보고</a>
+    <a href="#report" role="tab" aria-selected="${active === 'report'}" class="${active === 'report' ? 'on' : ''}">📄 결과보고서</a></div>`;
+  const dayDone = n => !!(v(`daily:${n}:summary`).trim() || v(`daily:${n}:insight`).trim() || v(`daily:${n}:issue`).trim());
+  const goesTo = t => `<span class="goes">→ 결과보고서 ${t}</span>`;
   pages.daily = p => {
     const n = Math.min(5, Math.max(1, +p || defaultDay()));
     const d = T.days[n - 1];
     const visits = T.orgs.filter(o => o.day === n);
-    return `<h2 class="ph2">📅 일일보고</h2>${dayTabs(n, 'daily')}
+    return `${reportTabs('daily')}
+    <div class="day-tabs">${T.days.map(x => `<button data-act="go" data-to="daily/${x.n}" class="${x.n === n ? 'on' : ''} ${x.date === todayStr() ? 'today' : ''}">${dayDone(x.n) ? '✅ ' : ''}${x.n}일차<small>${x.label}</small></button>`).join('')}</div>
     <div class="card"><h3>${n}일차 · ${d.label} <span class="tag">${esc(d.city)}</span></h3>
-      ${visits.length ? `<p class="muted">방문: ${visits.map(o => `<a href="#org/${o.id}">${esc(o.name)}</a>`).join(', ')}</p>` : ''}
-      ${area(`daily:${n}:summary`, '오늘 주요 내용', '오늘 있었던 일, 성과', 6)}
-      ${area(`daily:${n}:insight`, '시사점 · 특이사항', '배운 점, 건의·특이사항', 4)}
-      <button class="btn orange" style="width:100%;margin-top:14px" data-act="share" data-n="${n}">📤 카톡으로 보내기 (일정·질의응답 포함)</button></div>`;
+      ${visits.length ? `<p class="muted">방문: ${visits.map(o => `<a href="#org/${o.id}">${esc(o.name)}</a>`).join(', ')} <small>(기관별 내용은 '기관 기록'에)</small></p>` : ''}
+      <div class="auto-note">✓ 적은 내용은 자동 저장되고, <b>결과보고서에 그대로 들어갑니다.</b> 따로 옮겨 적을 필요가 없습니다.</div>
+      ${area(`daily:${n}:summary`, `오늘 주요 내용 ${goesTo('Ⅱ. 일자별 활동')}`, '오늘 있었던 일, 성과', 5)}
+      ${area(`daily:${n}:insight`, `시사점 · 배운 점 ${goesTo('Ⅳ. 주요 시사점')}`, '부산교육에 참고할 점, 배운 점', 3)}
+      ${area(`daily:${n}:issue`, `특이사항 · 건의 ${goesTo('Ⅱ. 비고')}`, '일정 변경, 건강, 건의 등 (선택)', 2)}
+      <div class="btn-row"><a class="btn" href="#report/day${n}">📄 결과보고서에서 ${n}일차 보기</a>
+      <button class="btn line small" data-act="share" data-n="${n}">카톡 공유 (선택)</button></div></div>`;
   };
 
   /* --- 결과 보고서 --- */
@@ -301,7 +312,10 @@
   function buildReport() {
     const d = new Date();
     const title = rv('title', `2026년 ${T.title} 공무국외출장 결과보고서`);
-    const insights = T.orgs.map(o => v(`note:${o.id}:insight`).trim() ? `○ (${o.name}) ${withSig(`note:${o.id}:insight`)}` : '').filter(Boolean).join('\n');
+    // Ⅳ 주요 시사점 = 기관 메모의 시사점 + 일일보고의 시사점 (자동 모음)
+    const insights = T.orgs.map(o => v(`note:${o.id}:insight`).trim() ? `○ (${o.name}) ${withSig(`note:${o.id}:insight`)}` : '')
+      .concat(T.days.map(x => v(`daily:${x.n}:insight`).trim() ? `○ (${x.n}일차) ${withSig(`daily:${x.n}:insight`)}` : ''))
+      .filter(Boolean).join('\n');
     return { title, html: `<div class="rep-logo"><img src="${new URL('img/logo-wide.jpg', location.href).href}" alt="부산광역시교육청" width="220"></div><h1>${esc(title)}</h1><div class="rep-org">${esc(T.org)} · ${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.</div>
     <h2>Ⅰ. 출장 개요</h2><table>
       <tr><th>목적</th><td>${T.purpose.map(esc).join('<br>')}</td></tr>
@@ -310,7 +324,7 @@
       <tr><th>출장자</th><td>${T.members.map(m => `${esc(m.role)}: ${esc(m.name)}`).join('<br>')}</td></tr>
       <tr><th>방문 기관</th><td>${T.orgs.map(o => `${o.no}. ${esc(o.name)}`).join('<br>')}</td></tr></table>
     <h2>Ⅱ. 일자별 활동</h2><table><tr><th style="width:18%">일자</th><th>주요 일정</th><th>활동 내용</th></tr>
-      ${T.days.map(x => `<tr><td>${x.n}일차<br>${x.label}</td><td>${x.items.map(i => `${esc(i.t)} ${esc(i.what)}`).join('<br>')}</td><td>${cell(withSig(`daily:${x.n}:summary`))}</td></tr>`).join('')}</table>
+      ${T.days.map(x => `<tr id="rep-day${x.n}"><td>${x.n}일차<br>${x.label}</td><td>${x.items.map(i => `${esc(i.t)} ${esc(i.what)}`).join('<br>')}</td><td>${cell(withSig(`daily:${x.n}:summary`))}${v(`daily:${x.n}:issue`).trim() ? `<br><br><b>[비고]</b> ${nl2br(withSig(`daily:${x.n}:issue`))}` : ''}</td></tr>`).join('')}</table>
     <h2>Ⅲ. 기관별 방문 결과</h2>
     ${T.orgs.map(o => `<h3>${o.no}. ${esc(o.name)} (${esc(o.cn)})</h3><table>
       <tr><th>일시</th><td>${esc(o.time)}</td></tr>
@@ -327,9 +341,10 @@
   pages.report = () => {
     const done = T.orgs.filter(o => v(`note:${o.id}:summary`).trim()).length;
     const qa = T.orgs.reduce((s, o) => { const g = orgProgress(o); return [s[0] + g.a, s[1] + g.q]; }, [0, 0]);
-    return `<div class="no-print"><h2 class="ph2">📄 결과 보고서</h2>
-      <p class="muted">팀원 모두의 기록이 자동으로 모입니다. 아래 3칸만 채우면 완성됩니다.</p>
-      <div class="card"><p style="margin:0">기관 메모 <b>${done}/${T.orgs.length}</b> · 질의 답변 <b>${qa[0]}/${qa[1]}</b> · 사진 <b>${PH.length}장</b></p></div>
+    return `${reportTabs('report')}<div class="no-print">
+      <p class="muted">일일보고·기관 기록·사진이 자동으로 모입니다. 아래 3칸만 채우면 완성됩니다.</p>
+      <div class="card"><p style="margin:0 0 8px"><b>일일보고</b> ${T.days.map(x => `<a class="day-chip ${dayDone(x.n) ? 'ok' : ''}" href="#daily/${x.n}">${dayDone(x.n) ? '✅' : '⬜'} ${x.n}일차</a>`).join(' ')}</p>
+        <p style="margin:0">기관 메모 <b>${done}/${T.orgs.length}</b> · 질의 답변 <b>${qa[0]}/${qa[1]}</b> · 사진 <b>${PH.length}장</b></p></div>
       ${area('report:overall', 'Ⅳ. 종합 의견', '이번 방문의 총평', 5)}
       ${area('report:suggest', 'Ⅴ. 부산교육 정책 제언', '', 5)}
       ${area('report:plan', 'Ⅵ. 향후 계획', '예: 결과보고회, 교류협력 추진 등', 3)}
@@ -393,7 +408,8 @@
     app.innerHTML = needDb && !READY ? setupPage() : pages[cur](param);
     if (same) { const ds = $$('details', app); openIdx.forEach(i => { if (ds[i]) ds[i].open = true; }); window.scrollTo(0, y); }
     lastRoute = route;
-    $$('.bottom-nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === (cur === 'org' ? 'orgs' : cur)));
+    const navOf = { org: 'orgs', daily: 'report', report: 'report' }; // 일일보고·결과보고서는 '보고' 탭 하나
+    $$('.bottom-nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === (navOf[cur] || cur)));
     growAll();
     if (animate) { app.classList.remove('page-in'); requestAnimationFrame(() => app.classList.add('page-in')); } // 강제 재계산 없이 애니메이션 재시작
   }
@@ -405,7 +421,14 @@
     ts.forEach((t, i) => { t.style.height = hs[i] + 'px'; });
   }
   const refresh = () => pull().then(changed => { if (changed && !isTyping()) render(false); });
-  window.addEventListener('hashchange', () => { render(true); window.scrollTo(0, 0); if (READY) refresh(); });
+  // #report/day3 처럼 오면 결과보고서의 그 날 줄로 이동해 잠깐 강조
+  function scrollAnchor() {
+    const m = /^#report\/day(\d)$/.exec(location.hash); if (!m) return;
+    const row = document.getElementById('rep-day' + m[1]); if (!row) return;
+    row.scrollIntoView({ block: 'center' }); // 즉시 이동 (배경 새로고침이 와도 위치 유지)
+    row.classList.remove('hl'); requestAnimationFrame(() => row.classList.add('hl'));
+  }
+  window.addEventListener('hashchange', () => { render(true); window.scrollTo(0, 0); scrollAnchor(); if (READY) refresh(); });
 
   /* =================== 이벤트 =================== */
   app.addEventListener('input', e => {
@@ -528,7 +551,7 @@
 
   /* =================== 시작 =================== */
   setFs(document.documentElement.dataset.fs || '1'); // 기본: 가장 작은 글씨
-  showWho(); syncStatus(); render(true);
+  showWho(); syncStatus(); render(true); scrollAnchor();
   if (READY) { refresh().then(() => push()); if (!myName()) openName(); }
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

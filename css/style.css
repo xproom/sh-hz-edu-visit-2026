@@ -494,3 +494,16 @@ body { padding-bottom: calc(70px + var(--lane) + 16px + env(safe-area-inset-bott
 .q-orig { font-size: .8rem; color: var(--muted); margin: 8px 0 0; }
 [hidden] { display: none !important; }
 .qa-item .q .q-text { flex: 1; min-width: 0; background: none; color: var(--ink); height: auto; padding: 0; border-radius: 0; font-size: 1rem; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* ---- 보고 탭: [일일보고 | 결과보고서] ---- */
+.bottom-nav { grid-template-columns: repeat(3, 1fr); }
+.seg { display: flex; gap: 4px; background: var(--navy-l); padding: 4px; border-radius: 14px; margin: 4px 0 14px; position: sticky; top: calc(70px + env(safe-area-inset-top)); z-index: 10; }
+.seg a { flex: 1; text-align: center; padding: 10px 8px; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 10px; text-decoration: none; font-weight: 800; color: var(--navy); transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
+.seg a.on { background: #fff; color: var(--accent); box-shadow: 0 2px 8px rgba(31,39,71,.15); }
+.auto-note { background: #eef6f1; color: #14532d; border-radius: 12px; padding: 10px 14px; font-size: .88rem; margin: 6px 0 4px; }
+.goes { display: inline-block; margin-left: 6px; font-size: .72rem; font-weight: 700; color: var(--ok); background: #e3f4ea; border-radius: 999px; padding: 1px 8px; vertical-align: middle; }
+.day-chip { display: inline-block; padding: 4px 10px; margin: 2px 2px 2px 0; border-radius: 999px; background: #fff3e8; color: var(--accent); text-decoration: none; font-size: .82rem; font-weight: 700; border: 1px solid #f3c7ad; }
+.day-chip.ok { background: #e3f4ea; color: var(--ok); border-color: #a9d9bd; }
+.sheet tr.hl td { animation: hl 2.4s ease; }
+@keyframes hl { 0%, 40% { background: #fff1a8; } 100% { background: transparent; } }
+@media print { .seg { display: none !important; } }
