@@ -189,7 +189,7 @@
     const cur = currentItem(d);
     const h = d.hotel != null ? T.hotels[d.hotel] : null;
     return `<div class="hero-s"><b>${esc(T.title)}</b><span>2026.11.29.(일) ~ 12.3.(목)</span><span class="dday">${chip}</span></div>
-    ${dd > 0 && sel === 1 ? `<div class="card accent"><b>🧳 11.29.(일) 오전 ${T.meet.time} 김해공항 집결</b><br>부산 12:35 출발 → 상하이 13:25 도착 (중국동방항공)</div>` : ''}
+    ${dd > 0 && sel === 1 ? `<div class="card accent"><b>🧳 11.29.(일) 오전 ${T.meet.time} 김해공항 집결</b><br>부산 12:35 출발 → 상하이 13:25 도착 (중국동방항공 MU5044)</div>` : ''}
     ${dayTabs(sel, 'home')}
     <div class="card"><h3>${d.n}일차 · ${d.label} <span class="tag">${esc(d.city)}</span></h3>
       <ul class="timeline">${d.items.map((it, i) => {
@@ -198,10 +198,10 @@
       }).join('')}</ul></div>
     ${h ? `<div class="card"><h3>🏨 오늘 숙소</h3><p class="big" style="margin:0">${esc(h.ko)}</p><p class="muted">${esc(h.name)}</p>
       <div class="btn-row"><a class="btn" href="tel:${tel(h.tel)}">📞 전화</a><button class="btn orange" data-act="taxi" data-kind="hotel" data-i="${d.hotel}">🚕 기사에게 보여주기</button></div></div>`
-      : `<div class="card"><h3>🛫 귀국</h3><p>상하이 푸동 18:30 출발 → 부산 20:30 도착 (춘추항공)</p></div>`}
+      : `<div class="card"><h3>🛫 귀국</h3><p>상하이 푸동 18:30 출발 → 부산 20:30 도착 (춘추항공 9C6899)</p></div>`}
     <div class="fold-group">
     ${fold('✈️', 'c1', '항공 · 차량 · 숙소', '출국 11.29. 12:35 · 귀국 12.3. 18:30 · 호텔 2곳',
-      T.flights.map(f => `<p><b>${f.type} ${esc(f.date)}</b> ${esc(f.airline)}<br>${esc(f.from)} ${f.dep} → ${esc(f.to)} ${f.arr}</p>`).join('') +
+      T.flights.map(f => `<p><b>${f.type} ${esc(f.date)}</b> ${esc(f.airline)}${f.no ? ` <b>${esc(f.no)}</b>` : ''}<br>${esc(f.from)} ${f.dep} → ${esc(f.to)} ${f.arr}</p>`).join('') +
       `<p><b>차량</b> ${esc(T.vehicle.title)} (상하이↔항저우 약 3시간)</p>` +
       T.hotels.map((x, i) => `<p><b>${esc(x.city)}</b> ${esc(x.nights)}<br>${esc(x.ko)}<br><span class="muted">${esc(x.addr)}</span><br><a href="tel:${tel(x.tel)}">📞 ${esc(x.tel)}</a> · <a href="#" data-act="taxi" data-kind="hotel" data-i="${i}">🚕 중국어 주소</a></p>`).join(''))}
     ${fold('🚨', 'c2', '비상 연락처', '총영사관 · 경찰 110 · 구급 120',
@@ -555,7 +555,7 @@
     if (a === 'hwpx') { // 공문서 형식 한글 파일 만들기
       await push();
       try {
-        if (!HEADER) HEADER = await (await fetch('hwpx/header.xml?v=25')).text();
+        if (!HEADER) HEADER = await (await fetch('hwpx/header.xml?v=26')).text();
         const r = reportModel();
         const bytes = HWPX.build(r.model, HEADER, { title: r.title, creator: myName() || T.org });
         const aEl = document.createElement('a');
