@@ -555,7 +555,7 @@
     if (a === 'hwpx') { // 공문서 형식 한글 파일 만들기
       await push();
       try {
-        if (!HEADER) HEADER = await (await fetch('hwpx/header.xml?v=26')).text();
+        if (!HEADER) HEADER = await (await fetch('hwpx/header.xml?v=27')).text();
         const r = reportModel();
         const bytes = HWPX.build(r.model, HEADER, { title: r.title, creator: myName() || T.org });
         const aEl = document.createElement('a');
